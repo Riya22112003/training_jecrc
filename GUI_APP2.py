@@ -1,12 +1,15 @@
+#from importlib.resources import path
 import tkinter as ttk
+#from turtle import left
 import pandas as pd
 import warnings
 warnings.filterwarnings('ignore')
-
+# import os
+# print('location is:',os.getcwd(),'\n\n\\n')
 
 app=ttk.Tk()
 app.title('Recommendation System')
-app.geometry('1000x1000')
+app.geometry('500x400')
 
 cols=['user_id','movie_id','rating','ts']
 df=pd.read_csv('u.data',sep='\t',names=cols)
@@ -16,16 +19,54 @@ movie=pd.merge(df,df1,on='movie_id')
     
 
 result=ttk.Variable(app)
-box=ttk.Listbox(app,height=10)
-for row,val in movie.iterrows():
-    box.insert(row+1,val['title'])
-box.place(x=10,y=10)
+
+frame=ttk.Frame(app)
+frame.place(x=10,y=10)
+box=ttk.Listbox(frame,height=10,width=60)
+for title in movie['title'].unique():
+    box.insert(ttk.END,title)
+
+box.pack(side='left',fill='y')
+#box.grid(row=0,column=0)
+#box.place(x=10,y=10)
+
+
+scroll=ttk.Scrollbar(frame,orient=ttk.VERTICAL)
+scroll.config(command=box.yview)
+box.config(yscrollcommand=scroll.set)
+scroll.pack(side='right',fill='y')
 
 def get_movie():
-    pass
 
-ttk.Button(app,text='Find Recommendations',font=('Ariel',25),command=get_movie).place(x=200,y=50)
-ttk.Label(app,textvariable=result,font=('Ariel',22)).place(x=200,y=100)
+    movie_selected=box.get(box.curselection())
+    print('movie_selected:',movie_selected)
+     
+    # Create Pivot Table
+    movie_pivot=movie.pivot_table( index='user_id',columns='title',values='rating')
+        
+    # find similarity for selected movie
+    corrs = movie_pivot.corrwith(movie_pivot[movie_selected])
+    corrs_df=pd.DataFrame(corrs,columns=['correlation'])
+    corrs_df['rating']=movie.groupby('title')['rating'].mean()
+    corrs_df['count']=movie['title'].value_counts()
+        
+    # find top 2-3 recommendations
+    top_recom =list(corrs_df[corrs_df['count']>50].sort_values(by='correlation',ascending=False).head(3).index)
+    
+    #important
+    if movie_selected in top_recom:    
+        top_recom.remove(movie_selected)
+    print('recomendations:',top_recom)
+
+    if top_recom:
+        result.set(top_recom[0])
+    else:
+        result.set('sorry no recomendations found!!')
+
+
+
+ttk.Button(app,text='Find Recommendations',font=('Ariel',25),command=get_movie).place(x=40,y=200)
+ttk.Label(app,textvariable=result,font=('Ariel',22)).place(x=40,y=300)
 
 app.mainloop()
 
